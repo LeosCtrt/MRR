@@ -1,0 +1,335 @@
+---
+title: "Rapport TP1"
+author: "Léos Coutrot - Colin Coërchon"
+date: "09-10-2023"
+header-includes:
+  - \usepackage[utf8]{inputenc}
+  - \usepackage{amssymb}
+  - \usepackage{amsmath}
+  - \usepackage{mathrsfs}
+  - \usepackage{stmaryrd}
+  - \usepackage{xstring}
+  - \usepackage{bbold}
+  - \usepackage{xcolor}
+  - \usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue]{hyperref}
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+\input{preambule.tex}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\newpage
+
+# IV. Application: study your own data using a linear model with transformed data
+
+Pour cet exercice, le jeu de données choisies était plutôt libre. Nous avons alors collecté sur internet un jeu de données indiquant la valeur
+boursière d'Apple depuis 1981 à différents moments dans le temps. Nous avons
+affiné le jeu de données pour qu'il garde uniquement la première valeur
+de chaque année. Le jeu de données complet est disponible ici : \href{https://www.kaggle.com/datasets/prasoonkottarathil/apple-lifetime-stocks-dataset}{lien}.
+
+```{r}
+data<-read.table("appledata.csv",header=TRUE,sep = "\t")
+print(data)
+```
+
+Notre colonne cible est donc \texttt{Adj.Close} qui correspond à "Adjusted close", la valeur de clôture ajustée d'une action ou d'un autre titre financier en bourse.
+
+Nous avons choisi cette indicateur pour retracer l'évolution d'Apple au cours des 40 dernières années. En effet, après avoir fait quelques recherches, cela serait un des indicateurs les plus précis pour analyser la performance historique d'une action. Nous allons donc effectuer une régression linéaire sur notre tout nouveau jeu de données.
+
+```{r}
+Y<-data$Adj.Close
+X <- data$ANNEE
+initial_fit <- lm(Adj.Close ~ ANNEE, data = data)
+summary(initial_fit)
+plot(data$Adj.Close, fitted(initial_fit), xlab="Observed Values", ylab="Predicted Values",
+     pch=19, col="blue")
+grid()
+abline(a=0, b=1, col="red")
+```
+
+On observe sur le graphique que le modèle proposé ne correspond
+visiblement pas. De plus, notre coefficient de détermination $R^2$ nous
+indique que notre modèle n'est potentiellement pas bon (cette valeur est
+fiable car nous travaillons ici dans un modèle avec peu de dimensions).
+
+On se propose donc de visualiser le jeu de données avec le modèle proposé. Cela va nous permettre de visualiser, et donc mieux comprendre d'où viendrait l'erreur.
+
+```{r,out.width="75%", fig.align='center'}
+plot(data$ANNEE,Y,xlab="Année",ylab="Valeur boursière")
+abline(initial_fit,col="red")
+```
+
+Sur le graphique, on observe ainsi que les données n'ont pas l'air de suivre un modèle linéaire. Un \textbf{modèle exponentiel} semblerait beaucoup plus adapté.
+
+Pour ce faire, on peut appliquer à notre colonne cible (ici $Y$), la transformation suivante : $\widetilde{Y}=\ln(Y)$. Ainsi, on transforme les données de façon à ce qu'elles soient plus adaptés à un modèle linéaire. 
+
+Voici donc le nouveau jeu de données :
+
+```{r,out.width="75%", fig.align='center'}
+data$Log_Close <- log(Y)
+plot(data$ANNEE, data$Log_Close, xlab="Années", ylab=expression(ln(Ajd.Close)))
+```
+
+Le jeu semble désormais mieux se prêter à une régression
+linéaire.
+
+```{r}
+log_fit <- lm(Log_Close ~ ANNEE, data = data)
+summary(log_fit)
+```
+
+Et visuellement, ça donne ceci :
+
+```{r,out.width="75%", fig.align='center'}
+plot(data$Log_Close, fitted(log_fit), xlab="Logarithme des valeurs observées",
+     ylab="Logarithmes des valeurs prédictes", pch=19, col="blue")
+grid()
+abline(a=0, b=1, col="red")
+```
+
+
+Et pour ce qui est des résidus $\varepsilon$ de notre modèle :
+
+```{r,out.width="75%", fig.align='center'}
+plot(data$ANNEE, residuals(log_fit), xlab="Années", ylab="Résidus",
+     main="Représentation des résidus")
+grid()
+abline(h=0, col="red")
+```
+
+
+Le modèle proposé semble donc correspondre beaucoup mieux dans le cadre d'une régression linéaire. Notre coefficient de détermination $R^2$ est bien meilleur tout comme notre RSE (Residual squared error). 
+
+Si l'on souhaite revenir à nos anciennes valeurs tout en gardant la solution proposée par ce modèle (donc $\ln(Y)=at+b$), il nous suffit de visualiser $Y = e^{at+b}$.
+
+```{r}
+x_seq <- seq(min(data$ANNEE), max(data$ANNEE), by = 0.1)
+a <- coef(log_fit)["ANNEE"]
+b <- coef(log_fit)["(Intercept)"]
+y_pred <- exp(a * x_seq + b)
+plot(data$ANNEE, Y, pch=19, col="blue")
+lines(x_seq, y_pred, col="red", lwd=2)
+```
+
+On remarque que le modèle proposé est bien meilleur que le précédent,
+cependant je pense personnellement qu'il pourrait être encore meilleur.
+Le début de l'explosion de l'exponentielle me semble être légèrement
+décalé par rapport à la réalité. Je pense que cela pourrait être dû au
+grand nombre de valeur entre 1980 et 2009 (lorsque la valeur boursière
+d'Apple était plus faible).
+\medskip
+
+Pour améliorer le modèle je pense qu'il pourrait être pertinent d'affiner le jeu de données en ajoutant plus de données récentes (de 2019 à 2023). Malheureusement ces dernières n'existaient pas dans le jeu de données fourni.
+
+
+
+
+\newpage
+# V. Cookies Study
+
+On nous donne dans cette partie un fichier \texttt{Cookies.csv} :
+
+```{r}
+data_cookies<-read.table(file = "cookies.csv", header=TRUE,sep=",")
+Y<-data_cookies$fat
+
+head(data_cookies[, 1:8])
+```
+
+Le fichier \texttt{Cookies.csv} comprend exactement 700 variables allant
+de "X1100" à "X2498". Et nous avons seulement 32 observations (cookies)
+dans ce jeu de données. L'objectif est d'ici d'effectuer une régression
+linéaire de la variable cible "Y" (\texttt{fat}) de notre jeu de
+données.
+
+Et voilà en qualité d'exemple le spectre des valeurs pour les 5 premiers cookies pour les 700 variables de notre problème.
+
+```{r}
+# On sélectionne les 5 premiers cookies
+spectres <- as.matrix(data_cookies[1:5, -1])
+
+# Le premier spectre
+plot(spectres[1,], type='l', ylim=range(spectres), main="Spectres des 5 premiers cookies",
+     xlab="Variables", ylab="Valeurs", col=1)
+
+# Le tracé des 4 autres spectres
+for (i in 2:5) {
+    lines(spectres[i,], col=i)
+}
+
+legend("bottomright", legend=paste("Cookie", 1:5), fill=1:5)
+
+```
+
+Cette régression linéaire pourrait prendre en compte les 700 variables
+du problèmes et prendrait alors la forme : 
+\begin{equation*}
+    Y = \beta_1 + \sum_{j=2}^{p+1} \beta_j X_j + \varepsilon
+\end{equation*}
+
+Avec :
+
+```{=tex}
+\begin{itemize}
+    \item $Y$ la valeur cible.
+    \item $X = (X_1, \dots, X^{p+1})$ les valeurs des différentes variables (avec $p=700$ ici)
+    \item Le "Data Set" : $D_n = \left\{ (x_i,y_i) \,|\, i \in \llbracket 1, n \rrbracket,\, y_i \in \RR, x_i \in \RR^p \right\}$ (avec $n=32$ ici).
+\end{itemize}
+```
+
+Cela nous amènerait alors dans la partie du cours "\textit{Towards parsimonious model}" car nous avons effectivement $p \gg n$. Quand le nombre de variables prédictives $p$ est beaucoup plus grand que le nombre d'observations $n$, cela peut entraîner un surajustement du modèle, où le modèle peut parfaitement s'adapter aux données d'entraînement mais se comporte mal sur de nouvelles données. Il y a donc différentes méthodes connues pour pallier à se problème dont nous avons abordé quelques unes dans le cours n°2.
+
+En bref, cette direction semble très intéressante, mais ce n'est pas l'objectif ici. \bigskip
+
+Dans notre situation, il nous est conseillé de transformer les données de 700 variables en 5 caractéristiques qui sont \textbf{la moyenne, l'écart-type, la "pente" (\textit{détaillé plus tard}), le minimum et le maximum}.
+Et ceci pour chaque donnée de Data Set.
+
+On se contentera donc du modèle suivant : \begin{equation*}
+    \boxed{
+    Y = \beta_1 + \sum_{j=2}^6 \beta_j X_j + \varepsilon
+    }
+\end{equation*}
+
+Avec :
+
+```{=tex}
+\begin{itemize}
+    \item $X_1 = (1, \dots, 1)$.
+    \item $X_2$ la moyenne.
+    \item $X_3$ l'écart-type.
+    \item $X_4$ la "pente" des valeurs.
+    \item $X_5$ le minimum.
+    \item $X_6$ le maximum.
+\end{itemize}
+```
+
+En réduisant le nombre de caractéristiques à seulement 5, nous espérons construire un modèle plus simple qui capture l'essence \textbf{des informations spectrales} tout en évitant le surajustement dû à un trop grand nombre de variables $p$.
+
+Voici la manière dont nous y sommes pris en R pour obtenir ce nouveau "Data Set" :
+
+```{r}
+spectra_data <- data_cookies[, -1]  # On enlève la "target value" Y (fat)
+
+moyennes <- rowMeans(spectra_data)
+
+ecart_types <- apply(spectra_data, 1, sd)
+
+# Fonction pour calculer la pente d'une série de données
+calculate_slope <- function(data) {
+  time_sequence <- 1:length(data)
+  linear_model <- lm(data ~ time_sequence)
+  return(coef(linear_model)[2])
+}
+
+pentes <- apply(spectra_data, 1, calculate_slope)
+
+minimums <- apply(spectra_data, 1, min)
+
+maximums <- apply(spectra_data, 1, max)
+
+
+features_data <- data.frame(
+  Fat = data_cookies$fat,
+  Moyenne = moyennes,
+  EcartType = ecart_types,
+  Pente = pentes,
+  Min = minimums,
+  Max = maximums
+)
+
+head(features_data)
+```
+
+À noter que la "pente", pour chaque ligne de donnée (chaque cookie), est calculée en effectuant une régression linéaire simple des valeurs spectrales par rapport à leur ordre séquentiel. Autrement dit, on trace les données spectrales et on calcule la pente de la ligne qui s'ajuste le mieux à ces points.
+
+
+À présent, il est enfin temps de tenter une régression linéaire (c'est tout de même notre notre objectif initial dans cet exercice). Pour ça, on utilise comme préconisé dansle cours la fonction \texttt{lm} de R pour effectuer notre régression linéaire avec comme "Target Value" la colonne "Fat".
+
+Voici le résultat sur RStudio :
+
+```{r}
+linear_model <- lm(Fat ~ ., data = features_data)
+
+model_summary <- summary(linear_model)
+print(model_summary)
+```
+
+La régression linéaire est établie. Regardons d'un peu plus près les résultats, histoire de voir ce que nous pouvons modifier dans le modèle.
+
+Commençons donc par afficher les coefficients $\beta$ :
+
+```{r}
+print(model_summary$coefficients)
+```
+
+Les coefficients donnent une indication de l'effet de chaque caractéristique sur la variable cible, "Fat". Un coefficient positif suggère une relation positive, c'est-à-dire que lorsque la caractéristique augmente, "Fat" tend aussi à augmenter, et vice versa.
+
+On va ainsi déterminer à l'aide de la \textit{p-value} les coefficients significatifs dans notre modèle linéaire. On prend par choix arbitraire $\alpha = 0.05$ pour classifier une \textit{p-value} comme "petite".
+
+```{r}
+significant_vars <- which(abs(model_summary$coefficients[, 4]) < 0.05)
+if (length(significant_vars) > 0) {
+  cat("Les variables suivantes sont statistiquement significatives:\n")
+  print(names(significant_vars))
+} else {
+  cat("Aucune variable n'est statistiquement significative au seuil de 0.05.\n")
+}
+
+```
+
+La fonction \texttt{lm} de R nous donne aussi des informations essentielles sur le fameux coefficient $R^2$ :
+
+```{r, echo=FALSE}
+cat("\nAjustement du modèle:\n")
+cat("----------------------\n")
+cat("R-squared (R²): ", model_summary$r.squared, "\n")
+cat("Adjusted R-squared (R² ajusté): ", model_summary$adj.r.squared, "\n")
+
+```
+
+Le $R^2$ donne une idée de la proportion de la variabilité de la variable cible qui est expliquée par les caractéristiques du modèle. Un $R^2$ plus proche de 1 indique un bon ajustement du modèle. Ici, on trouve un $R^2$ qui vaut $0.72$ environ, le modèle n'est pas parfait, mais il reste quand même pertinent dans notre étude. \bigskip
+
+Intéressons-nous aux résidus maintenant (les $\varepsilon$) :
+
+```{r, echo=FALSE}
+cat("\nRésidus du modèle:\n")
+cat("----------------------\n")
+residuals_info <- summary(linear_model$residuals)
+cat("Min: ", residuals_info["Min."], "\n")
+cat("1er Quartile: ", residuals_info["1st Qu."], "\n")
+cat("Médiane: ", residuals_info["Median"], "\n")
+cat("Moyenne: ", residuals_info["Mean"], "\n")
+cat("3ème Quartile: ", residuals_info["3rd Qu."], "\n")
+cat("Max: ", residuals_info["Max."], "\n")
+
+```
+
+Les résidus donnent une idée de la différence entre les valeurs prédites par le modèle et les valeurs réelles. Idéalement, les résidus devraient être centrés autour de zéro. Ici, on peut noter que leur moyenne est exactement à 0, et que la médiane s'en rapproche beaucoup. Les minimums et maximums ne sont pas eux-aussi pas adhérents, bien qu'ils s'écartent considérablement des valeurs réelles.
+
+Ce graphique donne une bonne visualisation de la répartition de ces résidus $\varepsilon$ de notre modèle.
+
+```{r,out.width="75%", fig.align='center'}
+plot(linear_model$fitted.values, linear_model$residuals, 
+     xlab = "Valeurs Ajustées", ylab = "Résidus", 
+     main = "Résidus vs Valeurs Ajustées")
+abline(h = 0, col = "red")
+
+```
+
+Dans notre étude du jeu de données "Cookies.csv", nous avons tenté d'expliquer la teneur en matière grasse en utilisant cinq caractéristiques spectrales : \textbf{moyenne, écart-type, pente, minimum et maximum}. Notre modèle linéaire a un $R^2$ de 0.7167, indiquant qu'il explique 71,67% de la variabilité du gras, avec un $R^2$ ajusté de 0.6622. Seules les caractéristiques écart-type et pente sont statistiquement significatives pour cette prédiction.
+
+Les résidus du modèle ont une moyenne et une médiane proche de zéro, indiquant un bon ajustement général. Cependant, certaines prédictions s'écartent notablement des valeurs réelles, suggérant des améliorations possibles pour le modèle (comme évoqué au début).
+
+
+
+

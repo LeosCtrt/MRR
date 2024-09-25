@@ -1,0 +1,13 @@
+Voici notre travail à deux pour ce TP1 de MERR.
+
+Nous conseillons d'effectuer une compilation sous format pdf du R Markdown. Cela garantira un meilleur rendu visuel au vu des modules LaTeX utilisés dans le document.
+
+Le dossier est composé de plusieurs fichiers :
+- Le R Markdown comprenant tout notre travail (Rapport_TP1_Coerchon_Coutrot.Rmd).
+- Un fichier en .tex (preambule.tex) indispensable pour une bonne compilation pdf.
+- Un fichier pdf (Rapport_TP1_Coerchon_Coutrot.pdf) qui correspond à la compilation sous format pdf du fichier Rmd.
+- Les fichiers appledata.csv et cookies.csv indispensables pour les deux parties.
+
+Bonne lecture !
+
+Colin Coërchon et Léos Coutrot
