@@ -9,7 +9,6 @@ Le dossier comprend :
 - Le pdf des slides de la présentation orale du 18/12/2023.
 
 Le travail sur ce projet a été réalisé à 2 : Colin Coërchon et Léos Coutrot.
-Nous sommes dans le groupe géré par M. Kylliann De Santiago
 
 Le fichier preambule.tex n'est pas crucial, mais c'est un répertoire contenant quelques raccourcis de commandes $\LaTeX$ qui rendent le pdf final beaucoup plus lisible.
 
