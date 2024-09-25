@@ -1,0 +1,426 @@
+---
+title: "Rapport TP3"
+author: "Léos Coutrot - Colin Coërchon"
+date: "09-10-2023"
+header-includes:
+  - \usepackage[utf8]{inputenc}
+  - \usepackage{amssymb}
+  - \usepackage{amsmath}
+  - \usepackage{mathrsfs}
+  - \usepackage{stmaryrd}
+  - \usepackage{xstring}
+  - \usepackage{bbold}
+  - \usepackage{xcolor}
+  - \usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue]{hyperref}
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+\input{preambule.tex}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(lars)
+library(glmnet)
+```
+
+# II - Cookies Study
+
+## 1 - Logistic regression model using features
+
+On nous donne dans cette partie un fichier \texttt{Cookies.csv} :
+
+```{r}
+tab = read.csv(file="cookies.csv",sep=',',dec='.',header=TRUE);
+Y <- tab$fat
+
+head(tab[, 1:8])
+```
+
+Le fichier \texttt{Cookies.csv} comprend exactement 700 variables allant
+de "X1100" à "X2498". Et nous avons seulement 32 observations (cookies)
+dans ce jeu de données.
+
+Et voilà en qualité d'exemple le spectre des valeurs pour les 5 premiers cookies pour les 700 variables de notre problème.
+
+```{r}
+# On sélectionne les 5 premiers cookies
+spectres <- as.matrix(tab[1:5, -1])
+
+# Le premier spectre
+plot(spectres[1,], type='l', ylim=range(spectres), main="Spectres des 5 premiers cookies",
+     xlab="Variables", ylab="Valeurs", col=1)
+
+# Le tracé des 4 autres spectres
+for (i in 2:5) {
+    lines(spectres[i,], col=i)
+}
+
+legend("bottomright", legend=paste("Cookie", 1:5), fill=1:5)
+
+```
+
+
+Le but de cette étude est d'expliquer si, pour un cookie, la valeur "fat" est supérieure ou non à la médiane des valeurs "fat" pour chacun des cookies (que l'on indiquera dans la cible binaire \texttt{Ybin}).
+
+```{r}
+YBin = as.numeric(tab$fat>median(tab$fat)); # Donné par la prof dans le TP
+median_fat <- median(tab$fat)
+tab$YBin <- YBin
+```
+
+
+Dans notre situation, il nous est conseillé de transformer les données de 700 variables en 5 caractéristiques qui sont \textbf{la moyenne, l'écart-type, la "pente" (\textit{détaillé plus tard}), le minimum et le maximum}, en plus de notre nouvelle variable binaire \texttt{Ybin}.
+Et ceci pour chaque donnée de Data Set.
+
+On se contentera donc du modèle suivant : \begin{equation*}
+    \boxed{
+    Y = \beta_1 + \sum_{j=2}^6 \beta_j X_j + \varepsilon
+    }
+\end{equation*}
+
+Avec :
+
+```{=tex}
+\begin{itemize}
+    \item $X_1 = (1, \dots, 1)$.
+    \item $X_2$ la moyenne.
+    \item $X_3$ l'écart-type.
+    \item $X_4$ la "pente" des valeurs.
+    \item $X_5$ le minimum.
+    \item $X_6$ le maximum.
+\end{itemize}
+```
+
+Voici la manière dont nous y sommes pris en R pour obtenir ce nouveau "Data Set" :
+
+```{r}
+tab$mean <- rowMeans(tab[,2:701])
+tab$std <- apply(tab[,2:701], 1, sd)
+tab$min <- apply(tab[,2:701], 1, min)
+tab$max <- apply(tab[,2:701], 1, max)
+tab$slope <- apply(tab[,2:701], 1, function(x) coef(lm(x ~ seq_along(x)))[2])
+features <- c('mean', 'std', 'min', 'max', 'slope')
+model1_data <- tab[, c(features, 'YBin')]
+
+head(model1_data)
+```
+
+À noter que la "pente", pour chaque ligne de donnée (chaque cookie), est calculée en effectuant une régression linéaire simple des valeurs spectrales par rapport à leur ordre séquentiel. Autrement dit, on trace les données spectrales et on calcule la pente de la ligne qui s'ajuste le mieux à ces points.
+
+
+À présent, il est enfin temps de réaliser notre régression logistique. Pour ça, on utilise comme préconisé dans le cours la fonction \texttt{glm} de R pour effectuer notre régression logistique avec comme "Binary Target Variable" la colonne \texttt{YBin} $\in \{0,1\}$.
+
+Voici le résultat sur RStudio :
+
+```{r}
+res <- glm(YBin ~ ., data = model1_data, family = "binomial")
+model_summary <- summary(res)
+model_summary
+```
+
+Regardons d'un peu plus près les coefficients qui sont importantes dans cette régression logistique, et ceux qui sont les plus insignifiants :
+
+```{r}
+coefficients_data <- model_summary$coefficients
+sorted_coefficients <- coefficients_data[order(coefficients_data[, "Pr(>|z|)"]), ]
+most_significant_coefficient <- head(sorted_coefficients, 2)
+least_significant_coefficient <- tail(sorted_coefficients, 2)
+
+print("Les coefficients les plus significatifs :")
+print(most_significant_coefficient)
+
+print("Les coefficients les moins significatifs :")
+print(least_significant_coefficient)
+```
+
+Ainsi, nous avons d'abord créé un modèle de \textbf{régression logistique} en utilisant toutes les variables disponibles dans \texttt{model1\_data}, en ciblant \texttt{YBin} comme \textbf{variable dépendante}.
+
+On remarque que la plupart des variables ont des p-values élevées, suggérant qu'elles ne sont pas statistiquement significatives dans ce modèle, à l'exception de \textbf{l'écart type} et de \textbf{la pente} qui approchent la significativité (p < 0.1).
+
+De plus, la réduction de la \textbf{déviance résiduelle} par rapport à la \textbf{déviance nulle} indique une amélioration par rapport au modèle nul, mais il est encore difficile de juger de la qualité de l'ajustement avec notre modèle actuel.
+\bigskip
+
+
+Après avoir construit le modèle initial, il est crucial de vérifier sa fiabilité. C'est là qu'intervient \textbf{la validation croisée K-fold} :
+
+
+```{r}
+k <- 10
+n <- nrow(tab)
+fold_indices <- sample(cut(seq(n), breaks=k, labels=FALSE))
+accuracies <- numeric(k)
+
+for(i in 1:k){
+  test_indices <- which(fold_indices == i)
+  train_data <- tab[-test_indices, ]
+  test_data <- tab[test_indices, ]
+  
+  fitted_model <- glm(YBin ~ mean + std + min + max + slope, data = train_data, family = "binomial")
+  predictions <- predict(fitted_model, test_data, type = "response")
+  predicted_classes <- ifelse(predictions > 0.5, 1, 0)
+  confusionMatrix <- table(test_data$YBin, predicted_classes)
+  accuracies[i] <- sum(diag(confusionMatrix)) / sum(confusionMatrix)
+}
+
+boxplot(accuracies, main = "Accuracy across K-Folds", ylab = "Accuracy", xlab = "Fold", col = "lightblue")
+
+```
+
+Avec \textbf{un AIC de 38.927} et une performance de validation croisée K-fold variant \textbf{de 0.7 à 1.0}, le modèle de régression logistique montre une capacité raisonnable à prédire si la teneur en matières grasses d'un cookie dépasse la médiane.
+
+Bien que l'ajustement du modèle soit acceptable (comme le suggère l'AIC), la variabilité dans les exactitudes de validation croisée indique une certaine instabilité du modèle (puisque seules les variables \texttt{std} et \texttt{slope} sont un minimum significatives).
+
+Bref, \textbf{on ne peut pas encore donner une conclusion précise} avec ces seules 5 informations sur les 700 variables initiales.
+
+
+
+
+
+
+
+
+\newpage
+## 2 - Logistic regression model using the spectra
+
+Nous reprenons les données de la première partie. Dans l'objectif de tester nos modèles plus tard avec des méthodes de validation croisée, nous allons séparer notre jeu de données en deux groupes bien distincts.
+Nous allons prendre 80% des données pour construire notre modèle (\texttt{train\_data}) et 20% pour les tester par la suite (\texttt{test\_data}). 
+
+```{r}
+tab=read.csv(file="cookies.csv",sep=',',dec='.',header=TRUE);
+YBin <- as.numeric(tab$fat > median(tab$fat))
+tab$YBin <- YBin
+
+split <- sample(c(TRUE, FALSE), nrow(tab), replace = TRUE, prob = c(0.8, 0.2))
+train_data <- tab[split, ]
+test_data <- tab[!split, ]
+```
+
+
+### Ridge regression
+
+On souhaite ici minimiser la fonction $\Phi$ donnée par :
+\begin{align*}
+    \Phi(\beta) &= \left\Vert Y - X\beta \right\Vert_2^2 + k \, \Vert \beta \Vert_2^2 \tag{avec $k \in \RRsp$} \\
+    \Longrightarrow \quad \Phi(\beta) &= (Y - X\beta)^T (Y - X\beta) + k \sum_{j=1}^p  \beta_j^2 \tag{avec $k \in \RRsp$}
+\end{align*}
+
+On utilise pour cela (comme recommandé dans le TP) la bibliothèque \texttt{glmnet} pour réaliser cette régression pénalisée. Et on peut alors tracer le joli chemin de régularisation pour les différentes valeurs de $k$ lorsqu'il augmente (de gauche à droite) :
+
+```{r}
+X_train <- as.matrix(train_data[, -which(names(train_data) %in% c("YBin"))])
+Y_train <- train_data$YBin
+
+ridge_model <- glmnet(X_train, Y_train, alpha = 0, family = "binomial")
+plot(ridge_model, xvar = "lambda", label = TRUE)
+```
+
+On s'intéresse alors à trouver le \textbf{k optimal}.
+
+La fonction \texttt{cv.glmnet()} trouve empiriquement la valeur qui minimise l'erreur de validation croisée (c'est-à-dire, une minimisation de notre fonction $\Phi$).
+
+Dans ce TP, comparé au TP2, on s'intéresse aussi à la valeur de k (ou $\lambda$)qui vérifie la règles « 1 erreur standard » (le modèle le plus pénalisé à la 1ère distance du modèle avec le moins d'erreur).
+
+```{r}
+cv_ridge <- cv.glmnet(X_train, Y_train, alpha = 0, family = "binomial", grouped=FALSE)
+
+# Affiche le meilleur lambda (k) trouvé
+print(cv_ridge$lambda.min)
+
+# Affiche le lambda 1sE trouvé
+print(cv_ridge$lambda.1se)
+
+```
+
+
+Les deux modèles finaux sont ajustés avec ces $k$ différents.
+\bigskip
+
+La fonction \texttt{cv.glmnet()} a donc utilisé une méthode de validation croisée, et cette librairie permet l'affichage très élégant de cette méthode là.
+
+```{r}
+plot(cv_ridge)
+
+ridge_min <- glmnet(X_train, Y_train, alpha = 0, family = "binomial", lambda = cv_ridge$lambda.min)
+ridge_1se <- glmnet(X_train, Y_train, alpha = 0, family = "binomial", lambda = cv_ridge$lambda.1se)
+
+```
+
+Après avoir déterminé les meilleurs valeurs de lambda, les coefficients correspondants (les $\beta$) sont extraits. Les variables les plus importantes, c'est-à-dire celles dont les coefficients ont les valeurs absolues les plus élevées, sont ensuite identifiées. Cela fournit un aperçu des prédicteurs qui ont le plus d'impact dans le modèle Ridge.
+
+On construit ainsi notre ensemble $\mathcal{M} \subset \llbracket 1, p \rrbracket$.
+
+Pour $\lambda_{min}$ :
+
+```{r}
+coef_ridge <- predict(ridge_min, type = "coefficients", s = cv_ridge$lambda.min)
+important_vars_ridge_min <- order(abs(coef_ridge), decreasing = TRUE)
+
+head(important_vars_ridge_min)
+```
+
+Pour $\lambda_{1se}$ :
+
+
+```{r}
+coef_ridge <- predict(ridge_1se, type = "coefficients", s = cv_ridge$lambda.1se)
+important_vars_ridge_1se <- order(abs(coef_ridge), decreasing = TRUE)
+
+head(important_vars_ridge_1se)
+```
+
+
+
+
+
+
+### Lasso Regression
+
+On souhaite ici minimiser la fonction $\Phi$ donnée par :
+\begin{align*}
+    \Phi(\beta) &= \left\Vert Y - X\beta \right\Vert_2^2 + k \, \Vert \beta \Vert_1 \tag{avec $k \in \RRsp$} \\
+    \Longrightarrow \quad \Phi(\beta) &= (Y - X\beta)^T (Y - X\beta) + k \sum_{j=1}^p \lvert \beta_j \rvert \tag{avec $k \in \RRsp$}
+\end{align*}
+
+Les données sont chargées de la même manière que pour Ridge. Comme pour la régression Ridge, les données pour la régression Lasso doivent également être centrées et réduites.
+
+```{r}
+lasso_model <- glmnet(X_train, Y_train, alpha = 1, family = "binomial")
+plot(lasso_model, xvar = "lambda", label = TRUE)
+```
+
+On s'intéresse alors à trouver le \textbf{k optimal}.
+
+La fonction \texttt{cv.glmnet()} trouve empiriquement la valeur qui minimise l'erreur de validation croisée (c'est-à-dire, une minimisation de notre fonction $\Phi$).
+
+Dans ce TP, comparé au TP2, on s'intéresse aussi à la valeur de k (ou $\lambda$)qui vérifie la règles « 1 erreur standard » (le modèle le plus pénalisé à la 1ère distance du modèle avec le moins d'erreur).
+
+
+```{r}
+cv_lasso <- cv.glmnet(X_train, Y_train, alpha = 1, family = "binomial", grouped = FALSE)
+
+# Affiche le meilleur lambda (k) trouvé
+print(cv_lasso$lambda.min)
+
+# Affiche le lambda 1sE trouvé
+print(cv_lasso$lambda.1se)
+
+```
+
+
+Les deux modèles finaux sont ajustés avec ces $k$ différents.
+\bigskip
+
+La fonction \texttt{cv.glmnet()} a donc utilisé une méthode de validation croisée, et cette librairie permet l'affichage très élégant de cette méthode là.
+
+```{r}
+plot(cv_lasso)
+
+lasso_min <- glmnet(X_train, Y_train, alpha = 1, family = "binomial", lambda = cv_lasso$lambda.min)
+lasso_1se <- glmnet(X_train, Y_train, alpha = 1, family = "binomial", lambda = cv_lasso$lambda.1se)
+
+```
+
+Après avoir déterminé les meilleurs valeurs de lambda, les coefficients correspondants (les $\beta$) sont extraits. Les variables les plus importantes, c'est-à-dire celles dont les coefficients ont les valeurs absolues les plus élevées, sont ensuite identifiées. Cela fournit un aperçu des prédicteurs qui ont le plus d'impact dans le modèle Ridge.
+
+On construit ainsi notre ensemble $\mathcal{M} \subset \llbracket 1, p \rrbracket$.
+
+- Pour $\lambda_{min}$ :
+
+```{r}
+coef_lasso <- predict(lasso_min, type = "coefficients", s = cv_lasso$lambda.min)
+important_vars_lasso_min <- order(abs(coef_lasso), decreasing = TRUE)
+
+head(important_vars_lasso_min)
+```
+
+- Pour $\lambda_{1se}$ :
+
+```{r}
+coef_lasso <- predict(lasso_1se, type = "coefficients", s = cv_lasso$lambda.1se)
+important_vars_lasso_1se <- order(abs(coef_lasso), decreasing = TRUE)
+
+head(important_vars_lasso_1se)
+```
+
+
+
+
+\newpage
+## 3 - Conclusion
+
+Pour comparer efficacement nos différents modèles, nous proposons d'estimer la précision en utilisant la méthode des K Folds. Nous examinerons donc les modèles suivants :
+\begin{itemize}
+\item \textbf{Le modèle Ridge} (min et 1se)
+\item \textbf{Le modèle Lasso} (min et 1se)
+\item Notre modèle avec les différentes caractéristiques identifiées dans la partie 1 (pente, minimum, maximum, etc.)
+\end{itemize}
+
+Nous avons déjà codé cette procédure pour le modèle incluant les différentes caractéristiques dans la partie 1. Il nous reste donc à coder cette version pour les modèles restants.
+
+```{r}
+k_fold_cv_glmnet <- function(data, k, alpha, lambda) {
+  fold_indices <- sample(cut(seq(nrow(data)), breaks=k, labels=FALSE))
+  accuracies <- numeric(k)
+
+  for (i in 1:k) {
+    test_indices <- which(fold_indices == i)
+    train_data <- data[-test_indices, ]
+    test_data <- data[test_indices, ]
+
+    X_train <- as.matrix(train_data[, -which(names(train_data) %in% c("YBin"))])
+    Y_train <- train_data$YBin
+    X_test <- as.matrix(test_data[, -which(names(test_data) %in% c("YBin"))])
+    model <- glmnet(X_train, Y_train, alpha = alpha, lambda = lambda, family = "binomial")
+    predictions <- predict(model, newx = X_test, type = "response", s = lambda)
+    predicted_classes <- ifelse(predictions > 0.5, 1, 0)
+    confusionMatrix <- table(test_data$YBin, predicted_classes)
+    accuracies[i] <- sum(diag(confusionMatrix)) / sum(confusionMatrix)
+  }
+
+  return(accuracies)
+}
+```
+
+Nous récupérons la liste des précisions pour chaque modèle et proposons de sélectionner un k égal à 10.
+
+```{r}
+ridge_min_accuracies <- k_fold_cv_glmnet(tab, 10, alpha = 0, lambda = cv_ridge$lambda.min)
+ridge_1se_accuracies <- k_fold_cv_glmnet(tab, 10, alpha = 0, lambda = cv_ridge$lambda.1se)
+lasso_min_accuracies <- k_fold_cv_glmnet(tab, 10, alpha = 1, lambda = cv_lasso$lambda.min)
+lasso_1se_accuracies <- k_fold_cv_glmnet(tab, 10, alpha = 1, lambda = cv_lasso$lambda.1se)
+```
+
+Nous allons donc visualiser toutes ces données dans \textbf{un graphique de type boxplot}.
+
+```{r}
+accuracies_list <- list( Ridge_Min = ridge_min_accuracies,Ridge_1se=ridge_1se_accuracies,Lasso_1se = lasso_1se_accuracies, Lasso_Min = lasso_min_accuracies ,Features = accuracies )
+
+boxplot(accuracies_list, 
+        main = "Model Accuracy Comparison", 
+        xlab = "Model Type", 
+        ylab = "Accuracy", 
+        col = c("lightblue", "lightgreen", "lightcoral","lightgrey","purple"),
+        names = c( "Ridge_min","Ridge_1se","Lasso_1se","Lasso min","Features"))
+
+```
+
+
+Nous remarquons sur le graphique que les résultats semblent étranges pour "Lasso 1se" et "Lasso min" qui ont une répartition très surprenante. Nous ne savons pas vraiment d'où vient cette potentielle erreur et nous ne les prendrons donc pas en compte dans notre analyse finale.
+
+Ceci dit, \textbf{le modèle Features semble être finalement le meilleur parmi les modèles restants}, en raison de sa médiane de précision plus élevée et de sa variabilité relativement faible. Cependant, on voit une potentielle valeur aberrante, ce qui pourrait poser problème dans certains cas.
+
+D'un autre côté, les deux modèles ridge semblent assez distincts, le modèle "Ridge min" a une très grande variabilité (la plus grande de tous les modèles du graphique), mais une médiane très légèrement supérieure à celle de "Ridge 1se". On note aussi que le modèle "Ridge 1se" possède des valeurs qui semblent aberrantes contrairement à "Ridge min", ce qui rendrait Ridge min peut-être plus pertinent que 1se. Mais \textbf{ces deux derniers ont une médiane et une variabilité de leur précision bien moins intéressante que le modèle Features}.
+
+En conclusion, nous pensons que le modèle le plus adéquat au vu de nos données est \textbf{le modèle Features}.
+\medskip
+
+Cependant, si les procédures K-fold des modèles "Lasso min" et "Lasso 1se" sont finalement corrects, cela signifie que \textbf{la précision des ces deux modèles est quasiment parfaite}, et qu'il serait alors tout naturel de privilégier ces derniers.
+
