@@ -1,0 +1,63 @@
+\newcommand{\nbSet}[1]{ % STYLE
+	\mathbb{#1}
+}
+
+\newcommand{\setPositive}{ % STYLE
+	\text{\bf{\tiny+}}
+}
+
+\newcommand{\setNegative}{ % STYLE
+	\mathbb{\tiny-}
+}
+
+\newcommand{\setStar}{ % STYLE
+	\text{*}
+}
+
+\newcommand{\NN}{\nbSet{N}}
+\newcommand{\ZZ}{\nbSet{Z}}
+\newcommand{\DD}{\nbSet{D}}
+\newcommand{\QQ}{\nbSet{Q}}
+\newcommand{\RR}{\nbSet{R}}
+\newcommand{\CC}{\nbSet{C}}
+\newcommand{\HH}{\nbSet{H}}
+
+\newcommand{\setDeco}[2]{
+	\IfEqCase{#2}{
+		{s}{\nbSet{#1}^{\setStar}}
+		{n}{\nbSet{#1}^{\phantom{\setStar}}_{\setNegative}}
+		{p}{\nbSet{#1}^{\phantom{\setStar}}_{\setPositive}}
+		{sn}{\nbSet{#1}^{\setStar}_{\setNegative}}
+		{sp}{\nbSet{#1}^{\setStar}_{\setPositive}}
+	}
+}
+
+\newcommand{\NNs}{ \ensuremath{\setDeco{N}{s}} }
+
+\newcommand{\ZZn}{ \ensuremath{\setDeco{Z}{n}} }
+\newcommand{\ZZp}{ \ensuremath{\setDeco{Z}{p}} }
+\newcommand{\ZZs}{ \ensuremath{\setDeco{Z}{s}} }
+\newcommand{\ZZsp}{ \ensuremath{\setDeco{Z}{sp}} }
+\newcommand{\ZZsn}{ \ensuremath{\setDeco{Z}{sn}} }
+
+\newcommand{\DDn}{ \ensuremath{\setDeco{D}{n}} }
+\newcommand{\DDp}{ \ensuremath{\setDeco{D}{p}} }
+\newcommand{\DDs}{ \ensuremath{\setDeco{D}{s}} }
+\newcommand{\DDsp}{ \ensuremath{\setDeco{D}{sp}} }
+\newcommand{\DDsn}{ \ensuremath{\setDeco{D}{sn}} }
+
+\newcommand{\QQn}{ \ensuremath{\setDeco{Q}{n}} }
+\newcommand{\QQp}{ \ensuremath{\setDeco{Q}{p}} }
+\newcommand{\QQs}{ \ensuremath{\setDeco{Q}{s}} }
+\newcommand{\QQsp}{ \ensuremath{\setDeco{Q}{sp}} }
+\newcommand{\QQsn}{ \ensuremath{\setDeco{Q}{sn}} }
+
+\newcommand{\RRn}{ \ensuremath{\setDeco{R}{n}} }
+\newcommand{\RRp}{ \ensuremath{\setDeco{R}{p}} }
+\newcommand{\RRs}{ \ensuremath{\setDeco{R}{s}} }
+\newcommand{\RRsp}{ \ensuremath{\setDeco{R}{sp}} }
+\newcommand{\RRsn}{ \ensuremath{\setDeco{R}{sn}} }
+
+\newcommand{\CCs}{ \ensuremath{\setDeco{C}{s}} }
+
+\newcommand{\HHs}{ \ensuremath{\setDeco{H}{s}} }
